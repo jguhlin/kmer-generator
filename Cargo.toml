@@ -1,0 +1,19 @@
+[package]
+name = "kmer-generator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# CITE: http://bioinformatics.oxfordjournals.org/content/early/2015/10/06/bioinformatics.btv573.short?rss=1
+
+[lib]
+name = "beaker_kmer_generator"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.16.5", features = ["extension-module"] }
+bio = "0.41.0"
+rand = "0.8.5"
+rand_xoshiro = "*"
+rand_distr = "0.4.3"
