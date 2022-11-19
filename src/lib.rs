@@ -90,7 +90,7 @@ impl KmerGenerator {
     pub fn set_aa(&mut self) {
         self.alphabet = AA_ALPHABET.to_vec();
         let mut weights: [u32; 25] = [23; 25];
-        weights[23] = 5;
+        weights[22] = 5;
 
         self.dist = WeightedAliasIndex::new(weights.to_vec()).unwrap();
         self.alphabet_len = 23;
@@ -211,7 +211,7 @@ impl KmerGenerator {
                             _ => panic!("Invalid alphabet length"),
                         };
 
-                        println!("{}", align_score);
+                        // println!("{}", align_score);
 
                         score = k as i32 - align_score;
 
@@ -240,7 +240,7 @@ impl KmerGenerator {
                                 _ => panic!("Invalid alphabet length"),
                             };
 
-                            println!("{}", align_score);
+                            // println!("{}", align_score);
 
                             score = k as i32 - align_score;
 
