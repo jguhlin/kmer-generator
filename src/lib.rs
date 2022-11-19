@@ -4,12 +4,14 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use bio::alignment::pairwise::*;
+use bio::scores::blosum62;
 use crossbeam::channel::bounded;
 use pyo3::prelude::*;
 use rand::distributions::{Distribution, Uniform};
 use rand_distr::weighted_alias::WeightedAliasIndex;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
+
 
 use std::thread;
 
@@ -23,8 +25,8 @@ static AA_ALPHABET: [u8; 23] = *b"ARNDCQEGHILKMFPSTWYVUOX";
 struct KmerGenerator {
     k: usize,
     dist: WeightedAliasIndex<u32>,
-    scoring: Scoring<MatchParams>,
-    aligner: Aligner<MatchParams>,
+    // scoring: Scoring<MatchParams>,
+    // aligner: Aligner<MatchParams>,
     scoring_dist: Uniform<u8>,
     substitution_dist: Uniform<usize>,
     threads: usize,
@@ -62,8 +64,8 @@ impl KmerGenerator {
         KmerGenerator {
             k: 21,
             dist: WeightedAliasIndex::new(vec![25, 25, 25, 25, 5]).unwrap(),
-            aligner: Aligner::with_capacity_and_scoring(21, 21, scoring.clone()),
-            scoring,
+            // aligner: Aligner::with_capacity_and_scoring(21, 21, scoring.clone()),
+            // scoring,
             scoring_dist: Uniform::new_inclusive(0, 21),
             substitution_dist: Uniform::new_inclusive(0, 21),
             threads: 1,
@@ -93,12 +95,16 @@ impl KmerGenerator {
 
         self.dist = WeightedAliasIndex::new(weights.to_vec()).unwrap();
         self.alphabet_len = 23;
+
+        // let scoring = Scoring::new(-5, -1, blosum62);
+
+        // self.aligner = Aligner::with_capacity_and_scoring(21, 21, scoring);
     }
 
     fn set_k(&mut self, k: usize) {
         self.k = k;
-        let aligner = Aligner::with_capacity_and_scoring(k, k, self.scoring.clone());
-        self.aligner = aligner;
+        // let aligner = Aligner::with_capacity_and_scoring(k, k, self.scoring.clone());
+        // self.aligner = aligner;
         self.scoring_dist = Uniform::new(0, k as u8);
         self.substitution_dist = Uniform::new(0, k);
     }
@@ -117,8 +123,8 @@ impl KmerGenerator {
             gap_extend_score,
         );
         let aligner = Aligner::with_capacity_and_scoring(self.k, self.k, scoring.clone());
-        self.scoring = scoring;
-        self.aligner = aligner;
+        // self.scoring = scoring;
+        // self.aligner = aligner;
     }
 
     fn set_threads(&mut self, threads: usize) {
@@ -142,11 +148,15 @@ impl KmerGenerator {
             for threadnum in 0..self.threads {
                 let tx = tx.clone();
                 let k = self.k;
-                let scoring = self.scoring.clone();
+                // let scoring = self.scoring.clone();
+
+                let dna_scoring = Scoring::from_scores(-5, -1, 1, -1);
+
                 let scoring_dist = Uniform::new_inclusive(0, self.k);
                 let substitution_dist = Uniform::new(0, self.k);
                 let dist = self.dist.clone();
-                let mut aligner = Aligner::with_capacity_and_scoring(self.k, self.k, scoring.clone());
+                let mut aligner = Aligner::with_capacity_and_scoring(self.k, self.k, dna_scoring.clone());
+                let mut blosum_aligner = Aligner::with_capacity(self.k, self.k, -5, -1, &blosum62);
 
                 let mut rng = Xoshiro256PlusPlus::seed_from_u64(self.seed);
 
@@ -187,7 +197,21 @@ impl KmerGenerator {
                             k2.push(alphabet[dist.sample(&mut rng) as usize]);
                         }
 
-                        score = k as i32 - aligner.local(&k1, &k2).score;
+                        let align_score = match alphabet_len {
+                            5 => {
+                                aligner
+                                    .local(&k1, &k2)
+                                    .score
+                            }
+                            23 => {
+                                blosum_aligner
+                                    .local(&k1, &k2)
+                                    .score
+                            }
+                            _ => panic!("Invalid alphabet length"),
+                        };
+
+                        score = k as i32 - align_score;
 
                         // If score diff is big enough, create a new random kmer
                         if target_score - score > (0.75 * k as f32) as i32 {
@@ -200,7 +224,21 @@ impl KmerGenerator {
                             k2[substitution_dist.sample(&mut rng)] =
                                 alphabet[dist.sample(&mut rng) as usize];
 
-                            score = k as i32 - aligner.local(&k1, &k2).score;
+                            let align_score = match alphabet_len {
+                                5 => {
+                                    aligner
+                                        .local(&k1, &k2)
+                                        .score
+                                }
+                                23 => {
+                                    blosum_aligner
+                                        .local(&k1, &k2)
+                                        .score
+                                }
+                                _ => panic!("Invalid alphabet length"),
+                            };
+
+                            score = k as i32 - align_score;
 
                             iter += 1;
 
