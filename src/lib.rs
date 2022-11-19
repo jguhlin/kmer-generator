@@ -59,7 +59,7 @@ fn convert_to_onehot(seq: &[u8], alphabet: &[u8], alphabet_len: usize) -> Vec<u8
 impl KmerGenerator {
     #[new]
     fn new() -> Self {
-        let scoring = Scoring::from_scores(-5, -1, 1, -1);
+        // let scoring = Scoring::from_scores(-5, -1, 1, -1);
         KmerGenerator {
             k: 21,
             dist: WeightedAliasIndex::new(vec![25, 25, 25, 25, 5]).unwrap(),
@@ -89,7 +89,7 @@ impl KmerGenerator {
 
     pub fn set_aa(&mut self) {
         self.alphabet = AA_ALPHABET.to_vec();
-        let mut weights: [u32; 25] = [23; 25];
+        let mut weights: [u32; 23] = [25; 23];
         weights[22] = 5;
 
         self.dist = WeightedAliasIndex::new(weights.to_vec()).unwrap();
