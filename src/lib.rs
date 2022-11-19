@@ -59,7 +59,6 @@ fn convert_to_onehot(seq: &[u8], alphabet: &[u8], alphabet_len: usize) -> Vec<u8
 impl KmerGenerator {
     #[new]
     fn new() -> Self {
-        println!("Version 1");
         let scoring = Scoring::from_scores(-5, -1, 1, -1);
         KmerGenerator {
             k: 21,
@@ -122,7 +121,7 @@ impl KmerGenerator {
             gap_open_score,
             gap_extend_score,
         );
-        let aligner = Aligner::with_capacity_and_scoring(self.k, self.k, scoring.clone());
+        // let aligner = Aligner::with_capacity_and_scoring(self.k, self.k, scoring.clone());
         // self.scoring = scoring;
         // self.aligner = aligner;
     }
@@ -183,7 +182,7 @@ impl KmerGenerator {
                         iter = 0;
 
                         for x in 0..k {
-                            k1[x] = alphabet[dist.sample(&mut rng) as usize];
+                            k1[x] = alphabet[dist.sample(&mut rng)];
                         }
 
                         k2 = k1.clone();
@@ -192,9 +191,10 @@ impl KmerGenerator {
 
                         score = 0;
 
-                        if target_score - score > (0.25 * k as f32) as i32 {
+                        // Introduce an indel
+                        if target_score - score > (0.3 * k as f32) as i32 {
                             k2.remove(substitution_dist.sample(&mut rng));
-                            k2.push(alphabet[dist.sample(&mut rng) as usize]);
+                            k2.push(alphabet[dist.sample(&mut rng)]);
                         }
 
                         let align_score = match alphabet_len {
@@ -211,10 +211,12 @@ impl KmerGenerator {
                             _ => panic!("Invalid alphabet length"),
                         };
 
+                        println!("{}", align_score);
+
                         score = k as i32 - align_score;
 
                         // If score diff is big enough, create a new random kmer
-                        if target_score - score > (0.75 * k as f32) as i32 {
+                        if target_score - score > (0.80 * k as f32) as i32 {
                             for x in 0..k {
                                 k2[x] = alphabet[dist.sample(&mut rng) as usize];
                             }
@@ -237,6 +239,8 @@ impl KmerGenerator {
                                 }
                                 _ => panic!("Invalid alphabet length"),
                             };
+
+                            println!("{}", align_score);
 
                             score = k as i32 - align_score;
 
