@@ -151,7 +151,8 @@ impl KmerGenerator {
 
                 let dna_scoring = Scoring::from_scores(-5, -1, 1, -1);
 
-                let scoring_dist = Uniform::new_inclusive(0, self.k);
+                let mut max_score = k;
+                let mut scoring_dist = Uniform::new_inclusive(0, self.k);
                 let substitution_dist = Uniform::new(0, self.k);
                 let dist = self.dist.clone();
                 let mut aligner = Aligner::with_capacity_and_scoring(self.k, self.k, dna_scoring.clone());
@@ -187,6 +188,25 @@ impl KmerGenerator {
 
                         k2 = k1.clone();
 
+                        let k1_max_score = match alphabet_len {
+                            5 => {
+                                aligner
+                                    .local(&k1, &k2)
+                                    .score
+                            }
+                            23 => {
+                                blosum_aligner
+                                    .local(&k1, &k2)
+                                    .score
+                            }
+                            _ => panic!("Invalid alphabet length"),
+                        };
+
+                        if k1_max_score as usize > max_score {
+                            max_score = k1_max_score as usize;
+                            scoring_dist = Uniform::new_inclusive(0, max_score);
+                        }
+
                         let target_score = scoring_dist.sample(&mut rng) as i32;
 
                         score = 0;
@@ -213,7 +233,7 @@ impl KmerGenerator {
 
                         // println!("{}", align_score);
 
-                        score = k as i32 - align_score;
+                        score = k1_max_score - align_score;
 
                         // If score diff is big enough, create a new random kmer
                         if target_score - score > (0.80 * k as f32) as i32 {
@@ -242,7 +262,7 @@ impl KmerGenerator {
 
                             // println!("{}", align_score);
 
-                            score = k as i32 - align_score;
+                            score = k1_max_score - align_score;
 
                             iter += 1;
 
@@ -325,9 +345,47 @@ impl KmerGenerator {
 
 }
 
-
 #[pymodule]
 fn beaker_kmer_generator(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<KmerGenerator>()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_aa_max_score() {
+
+        let mut scores = Vec::new();
+        let mut rng = Xoshiro256PlusPlus::seed_from_u64(42);
+
+        let k = 9;
+        let mut k1: Vec<u8> = vec![0; k];
+        let mut k2;
+        
+        let mut weights: [u32; 23] = [25; 23];
+        weights[22] = 5;
+
+        let dist = WeightedAliasIndex::new(weights.to_vec()).unwrap();
+        let mut blosum_aligner = Aligner::with_capacity(k, k, -5, -1, &blosum62);
+
+        for _ in 0..100_000 {
+            for x in 0..k {
+                k1[x] = AA_ALPHABET[dist.sample(&mut rng)];
+            }
+
+            k2 = k1.clone();
+
+            scores.push(blosum_aligner.local(&k1, &k2).score);
+        }
+
+        let max_score = scores.iter().max().unwrap();
+        let min_score = scores.iter().min().unwrap();
+        let avg_score = scores.iter().sum::<i32>() as f32 / scores.len() as f32;
+        println!("Max score: {}", max_score);
+        println!("Min score: {}", min_score);
+        println!("Avg score: {}", avg_score);
+    }
 }
