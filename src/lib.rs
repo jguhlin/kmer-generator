@@ -16,16 +16,8 @@ use std::thread;
 // TODO: Next step is to speed it up by splitting up the generation of kmer pairs to another thread
 // And keeping a buffer always full
 
-static ALPHABET: [u8; 5] = *b"ACGTN";
-
-fn convert_to_onehot(seq: &Vec<u8>) -> Vec<u8> {
-    let mut onehot = vec![0; seq.len() * 5];
-    for (i, c) in seq.iter().enumerate() {
-        let idx = ALPHABET.iter().position(|&x| x == *c).unwrap();
-        onehot[i * 5 + idx] = 1;
-    }
-    onehot
-}
+static DNA_ALPHABET: [u8; 5] = *b"ACGTN";
+static AA_ALPHABET: [u8; 23] = *b"ARNDCQEGHILKMFPSTWYVUOX";
 
 #[pyclass]
 struct KmerGenerator {
@@ -41,6 +33,24 @@ struct KmerGenerator {
     rx: Option<crossbeam::channel::Receiver<(Vec<u8>, Vec<u8>, i32)>>,
     handles: Vec<std::thread::JoinHandle<()>>,
     seed: u64,
+    alphabet: Vec<u8>,
+    alphabet_len: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Alphabet {
+    DNA,
+    AA,
+}
+
+fn convert_to_onehot(seq: &[u8], alphabet: &[u8], alphabet_len: usize) -> Vec<u8> {
+    let mut onehot = vec![0; seq.len() * alphabet_len];
+    for (i, c) in seq.iter().enumerate() {
+        
+        let idx = alphabet.iter().position(|&x| x == *c).unwrap();
+        onehot[i * alphabet_len + idx] = 1;
+    }
+    onehot
 }
 
 #[pymethods]
@@ -61,11 +71,28 @@ impl KmerGenerator {
             rx: None,
             handles: Vec::with_capacity(64),
             seed: 42,
+            alphabet: DNA_ALPHABET.to_vec(),
+            alphabet_len: 5,
         }
     }
 
     fn set_seed(&mut self, seed: u64) {
         self.seed = seed;
+    }
+
+    pub fn set_dna(&mut self) {
+        self.alphabet = DNA_ALPHABET.to_vec();
+        self.dist = WeightedAliasIndex::new(vec![25, 25, 25, 25, 5]).unwrap();
+        self.alphabet_len = 5;
+    }
+
+    pub fn set_aa(&mut self) {
+        self.alphabet = AA_ALPHABET.to_vec();
+        let mut weights: [u32; 25] = [23; 25];
+        weights[23] = 5;
+
+        self.dist = WeightedAliasIndex::new(weights.to_vec()).unwrap();
+        self.alphabet_len = 23;
     }
 
     fn set_k(&mut self, k: usize) {
@@ -99,7 +126,7 @@ impl KmerGenerator {
     }
 
     fn set_weights(&mut self, weights: Vec<u32>) {
-        assert!(weights.len() == 5);
+        assert!(weights.len() == self.alphabet_len);
         self.dist = WeightedAliasIndex::new(weights).unwrap();
     }
 
@@ -119,13 +146,16 @@ impl KmerGenerator {
                 let scoring_dist = Uniform::new_inclusive(0, self.k);
                 let substitution_dist = Uniform::new(0, self.k);
                 let dist = self.dist.clone();
-                let mut aligner = Aligner::with_capacity_and_scoring(21, 21, scoring.clone());
+                let mut aligner = Aligner::with_capacity_and_scoring(self.k, self.k, scoring.clone());
 
                 let mut rng = Xoshiro256PlusPlus::seed_from_u64(self.seed);
 
                 for _ in 0..threadnum {
                     rng.long_jump();
                 }
+
+                let alphabet = self.alphabet.clone();
+                let alphabet_len = self.alphabet_len;
 
                 let handle = std::thread::spawn(move || {
                     let mut score;
@@ -143,7 +173,7 @@ impl KmerGenerator {
                         iter = 0;
 
                         for x in 0..k {
-                            k1[x] = ALPHABET[dist.sample(&mut rng) as usize];
+                            k1[x] = alphabet[dist.sample(&mut rng) as usize];
                         }
 
                         k2 = k1.clone();
@@ -152,23 +182,23 @@ impl KmerGenerator {
 
                         score = 0;
 
-                        if target_score - score > 6 {
+                        if target_score - score > (0.25 * k as f32) as i32 {
                             k2.remove(substitution_dist.sample(&mut rng));
-                            k2.push(ALPHABET[dist.sample(&mut rng) as usize]);
+                            k2.push(alphabet[dist.sample(&mut rng) as usize]);
                         }
 
                         score = k as i32 - aligner.local(&k1, &k2).score;
 
                         // If score diff is big enough, create a new random kmer
-                        if target_score - score > 14 {
+                        if target_score - score > (0.75 * k as f32) as i32 {
                             for x in 0..k {
-                                k2[x] = ALPHABET[dist.sample(&mut rng) as usize];
+                                k2[x] = alphabet[dist.sample(&mut rng) as usize];
                             }
                         }
 
                         while score != target_score {
                             k2[substitution_dist.sample(&mut rng)] =
-                                ALPHABET[dist.sample(&mut rng) as usize];
+                                alphabet[dist.sample(&mut rng) as usize];
 
                             score = k as i32 - aligner.local(&k1, &k2).score;
 
@@ -186,8 +216,8 @@ impl KmerGenerator {
 
                         let mut msg = arch.dispatch(|| {
                             (
-                                convert_to_onehot(&k1),
-                                convert_to_onehot(&k2),
+                                convert_to_onehot(&k1, &alphabet, alphabet_len),
+                                convert_to_onehot(&k2, &alphabet, alphabet_len),
                                 score,
                             )
                         });
