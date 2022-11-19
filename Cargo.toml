@@ -12,8 +12,11 @@ name = "beaker_kmer_generator"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.16.5", features = ["extension-module"] }
-bio = "0.41.0"
+pyo3 = { version = "0.17.2", features = ["extension-module"] }
+bio = "1.0.0"
 rand = "0.8.5"
 rand_xoshiro = "*"
 rand_distr = "0.4.3"
+mimalloc = { version = "*", default-features = false }
+crossbeam = "0.8.1"
+pulp = "0.4.0"
