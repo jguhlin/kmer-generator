@@ -384,8 +384,40 @@ mod tests {
         let max_score = scores.iter().max().unwrap();
         let min_score = scores.iter().min().unwrap();
         let avg_score = scores.iter().sum::<i32>() as f32 / scores.len() as f32;
-        println!("Max score: {}", max_score);
-        println!("Min score: {}", min_score);
-        println!("Avg score: {}", avg_score);
+        println!("AA Max score: {}", max_score);
+        println!("AA Min score: {}", min_score);
+        println!("AA Avg score: {}", avg_score);
+    }
+
+    #[test]
+    fn test_nt_max_score() {
+
+        let mut scores = Vec::new();
+        let mut rng = Xoshiro256PlusPlus::seed_from_u64(42);
+
+        let k = 21;
+        let mut k1: Vec<u8> = vec![0; k];
+        let mut k2;
+        
+        let scoring = Scoring::from_scores(-5, -1, 1, -1);
+        let dist = WeightedAliasIndex::new(vec![25, 25, 25, 25, 5]).unwrap();
+        let mut aligner = Aligner::with_capacity_and_scoring(k, k, scoring.clone());
+
+        for _ in 0..100_000 {
+            for x in 0..k {
+                k1[x] = DNA_ALPHABET[dist.sample(&mut rng)];
+            }
+
+            k2 = k1.clone();
+
+            scores.push(aligner.local(&k1, &k2).score);
+        }
+
+        let max_score = scores.iter().max().unwrap();
+        let min_score = scores.iter().min().unwrap();
+        let avg_score = scores.iter().sum::<i32>() as f32 / scores.len() as f32;
+        println!("NT Max score: {}", max_score);
+        println!("NT Min score: {}", min_score);
+        println!("NT Avg score: {}", avg_score);
     }
 }
