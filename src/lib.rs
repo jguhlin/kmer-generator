@@ -335,7 +335,7 @@ impl KmerGenerator {
                 data.append(msg).expect("Unable to append to PyList");
             } else {
                 py.allow_threads(|| {
-                    println!("Waiting for data");
+                    println!("Waiting for data: {}", count);
                     std::thread::sleep(std::time::Duration::from_millis(64));
                 });
             }
