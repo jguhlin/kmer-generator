@@ -238,13 +238,13 @@ impl KmerGenerator {
                         // If score diff is big enough, create a new random kmer
                         if target_score - score > (0.80 * k as f32) as i32 {
                             for x in 0..k {
-                                k2[x] = alphabet[dist.sample(&mut rng) as usize];
+                                k2[x] = alphabet[dist.sample(&mut rng)];
                             }
                         }
 
                         while score != target_score {
                             k2[substitution_dist.sample(&mut rng)] =
-                                alphabet[dist.sample(&mut rng) as usize];
+                                alphabet[dist.sample(&mut rng)];
 
                             let align_score = match alphabet_len {
                                 5 => {
@@ -335,7 +335,7 @@ impl KmerGenerator {
                 data.append(msg).expect("Unable to append to PyList");
             } else {
                 py.allow_threads(|| {
-                    println!("Waiting for data: {}", count);
+                    // println!("Waiting for data: {}", count);
                     std::thread::sleep(std::time::Duration::from_millis(64));
                 });
             }
