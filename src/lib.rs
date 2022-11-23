@@ -330,8 +330,8 @@ impl KmerGenerator {
         });
 
         while count < 1024 {
-            count = count.saturating_add(1);
             if let Ok(msg) = rx.try_recv() {
+                count = count.saturating_add(1);
                 data.append(msg).expect("Unable to append to PyList");
             } else {
                 py.allow_threads(|| {
