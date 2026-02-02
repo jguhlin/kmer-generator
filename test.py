@@ -2,8 +2,9 @@ from beaker_kmer_generator import KmerGenerator as kmer_generator
 import plotille
 
 kg = kmer_generator()
-kg.set_threads(32)
+kg.set_threads(16)
 kg.set_seed(42)
+kg.set_aa()
 kg.start()
 
 j = list()

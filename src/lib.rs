@@ -12,7 +12,6 @@ use rand_distr::weighted_alias::WeightedAliasIndex;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256PlusPlus;
 
-
 use std::thread;
 
 // TODO: Next step is to speed it up by splitting up the generation of kmer pairs to another thread
